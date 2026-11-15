@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Eagle NGN</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+:root{--navy:#0b2f66;--blue:#1565c0;--gold:#f5b301;--green:#15803d;--ink:#0b2f66;--mute:#4a5f80}
+*{box-sizing:border-box}
+body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:var(--ink);background:linear-gradient(180deg,#3db5ff 0%,#1a86e8 45%,#0f62c8 100%);min-height:100vh;padding-bottom:calc(84px + env(safe-area-inset-bottom))}
+.wrap{max-width:480px;margin:0 auto;padding:12px 14px}
+.logo{text-align:center;padding:6px 0 10px}
+.logo b{display:block;font-size:30px;font-style:italic;font-weight:900;color:var(--navy);letter-spacing:1px}
+.logo span{font-size:13px;font-style:italic;color:var(--navy)}
+.card{background:#fff;border-radius:18px;padding:14px;margin-bottom:12px;box-shadow:0 4px 14px rgba(5,40,100,.25)}
+.dark{background:var(--navy);color:#fff}
+.lbl{font-size:12px;font-weight:700;letter-spacing:.5px;opacity:.85}
+.big{font-size:38px;font-weight:900;margin:4px 0}
+.pill{display:inline-block;background:var(--green);color:#fff;border-radius:99px;padding:4px 12px;font-size:13px;font-weight:600}
+.row{display:flex;align-items:center;gap:10px}
+.grow{flex:1;min-width:0}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
+.two .card{margin:0}
+.stat b{display:block;font-size:20px}
+.h{font-size:18px;font-weight:800;margin:0 0 8px}
+.t{padding:10px 0;border-top:1px solid #dbe6f5}
+.t:first-of-type{border-top:0}
+.t small{display:block;color:var(--mute);font-size:13px}
+.earn{display:inline-block;background:#d8eefc;border-radius:6px;padding:2px 8px;font-size:13px;font-weight:700;margin-top:4px}
+button{font:inherit;font-weight:700;border:0;border-radius:12px;padding:11px 16px;color:#fff;background:var(--blue);min-height:44px}
+button.g{background:var(--green)}
+button.o{background:#fff;color:var(--blue);border:2px solid var(--blue)}
+button:disabled{opacity:.55}
+.full{width:100%}
+input{width:100%;font:inherit;padding:12px;border:2px solid #b8cdea;border-radius:10px;margin:4px 0 10px;color:var(--ink);background:#fff}
+label{font-size:13px;font-weight:700}
+.nav{position:fixed;left:0;right:0;bottom:0;background:var(--navy);display:flex;justify-content:space-around;padding:8px 6px calc(8px + env(safe-area-inset-bottom))}
+.nav button{background:none;color:#b9cdee;font-size:12px;padding:4px 10px;display:flex;flex-direction:column;align-items:center;gap:2px;min-width:64px}
+.nav button i{font-style:normal;font-size:20px}
+.nav button.on{color:var(--gold)}
+.toast{position:fixed;top:12px;left:50%;transform:translateX(-50%);background:#111;color:#fff;padding:10px 16px;border-radius:12px;z-index:9;max-width:90%;font-weight:600}
+.ad{border:2px dashed var(--gold);border-radius:14px;padding:10px;margin-top:8px}
+.tag{font-size:11px;font-weight:800;color:#8a6200;background:#fff3cf;border-radius:6px;padding:2px 6px}
+.mute{color:var(--mute);font-size:13px}
+.c{text-align:center}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="toast" class="toast" hidden></div>
+<script>
+const tg=window.Telegram&&Telegram.WebApp;
+if(tg){tg.ready();tg.expand();}
+const API="https://whkbtojcnftyrxlihlak.supabase.co/functions/v1/dynamic-endpoint";
+let S=null,tab="home",busy=false,err="",timer;
+const F={bank:"",account:"",name:"",amount:""};
+const $=document.getElementById("app");
+const esc=s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const N=x=>"₦"+Number(x||0).toLocaleString("en-NG",{minimumFractionDigits:2,maximumFractionDigits:2});
+function openL(u){if(tg&&u.indexOf("https://t.me/")===0)tg.openTelegramLink(u);else window.open(u,"_blank")}
+function say(t){const e=document.getElementById("toast");e.textContent=t;e.hidden=false;clearTimeout(timer);timer=setTimeout(()=>{e.hidden=true},3000)}
+function copyL(l){navigator.clipboard.writeText(l).then(()=>say("Link copied"),()=>say("Press and hold the link to copy"))}
+function shareL(l){if(tg)tg.openTelegramLink("https://t.me/share/url?url="+encodeURIComponent(l)+"&text="+encodeURIComponent("Join Eagle NGN and earn!"));else copyL(l)}
+async function act(action,extra){
+  if(busy)return;busy=true;render();
+  try{
+    const r=await fetch(API,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(Object.assign({action:action,initData:tg?tg.initData:""},extra||{}))}).then(x=>x.json());
+    if(r.state)S=r.state;
+    if(r.error)err=r.error==="bad_auth"?"Please open Eagle NGN from the Telegram bot.":"Something went wrong. Try again.";else err="";
+    if(r.msg)say(r.msg);
+  }catch(e){err="No connection. Check your internet and retry."}
+  busy=false;render();
+}
+function bonusWait(){const l=S.user.last_bonus;return l?Math.max(0,new Date(l).getTime()+864e5-Date.now()):0}
+function hm(ms){const m=Math.ceil(ms/6e4);return Math.floor(m/60)+"h "+(m%60)+"m"}
+function tasks(){
+  return S.tasks.map(t=>`<div class="t row"><div class="grow"><b>${esc(t.title)}</b><small>${esc(t.description)}</small><span class="earn">Earn ${N(t.reward)}</span></div>${t.done?'<span class="pill">Done ✓</span>':`<div style="display:grid;gap:6px"><button class="o" onclick="openL('https://t.me/${esc(t.channel.replace("@",""))}')">Start</button><button class="g" ${busy?"disabled":""} onclick="act('claim_task',{task_id:${t.id}})">Claim</button></div>`}</div>`).join("")||'<p class="mute">No tasks right now.</p>';
+}
+function bonus(){const w=bonusWait();return `<div class="t row"><div class="grow"><b>🎁 Daily Bonus</b><small>Claim your daily reward</small><span class="earn">Earn ₦10</span></div><button class="g" ${busy||w?"disabled":""} onclick="act('claim_bonus')">${w?hm(w):"Claim"}</button></div>`}
+function ads(){return S.ads.map(a=>`<div class="ad"><span class="tag">AD</span> <b>${esc(a.title)}</b><div class="mute">${esc(a.body)}</div>${a.link?`<button class="o" style="margin-top:8px" onclick="openL('${esc(a.link)}')">Open</button>`:""}</div>`).join("")}
+function gate(){return `<div class="card c"><div style="font-size:56px">🦅</div><h2 class="h">Join our community</h2><p class="mute">Join the Eagle NGN community, then tap the button below to continue.</p><button class="full" onclick="openL('https://t.me/${S.community.slice(1)}')">Join community</button><div style="height:10px"></div><button class="g full" ${busy?"disabled":""} onclick="act('verify_join')">I have joined</button></div>`}
+function home(){return `<div class="card dark row"><div style="font-size:48px">👛</div><div class="grow c"><div class="lbl">MY WALLET BALANCE</div><div class="big">${N(S.user.balance)}</div><span class="pill">✓ Account Active</span></div></div>
+<div class="two"><div class="card stat row"><span style="font-size:28px">💰</span><div><span class="mute">Total Earned</span><b>${N(S.user.total_earned)}</b></div></div><div class="card stat row"><span style="font-size:28px">👥</span><div><span class="mute">Referrals</span><b>${S.referrals}</b></div></div></div>
+<div class="card"><h3 class="h">Available Tasks</h3>${tasks()}${bonus()}</div>
+<div class="card row"><div class="grow"><h3 class="h">Withdrawal</h3><div style="font-size:30px;font-weight:900">₦200</div><span class="mute">Minimum withdrawal</span></div><button onclick="go('wallet')">WITHDRAW NOW ›</button></div>
+<div class="card"><h3 class="h">Sponsored</h3>${ads()}</div>`}
+function tasksTab(){return `<div class="card"><h3 class="h">Tasks</h3>${tasks()}${bonus()}</div><div class="card"><h3 class="h">Sponsored</h3>${ads()}</div>`}
+function wallet(){
+  const hist=S.withdrawals.map(w=>`<div class="t row"><div class="grow"><b>${N(w.amount)}</b><small>${new Date(w.created_at).toLocaleDateString()}</small></div><span class="pill" style="background:${w.status==="paid"?"#15803d":w.status==="rejected"?"#b91c1c":"#b45309"}">${esc(w.status)}</span></div>`).join("")||'<p class="mute">No withdrawals yet.</p>';
+  return `<div class="card dark c"><div class="lbl">AVAILABLE BALANCE</div><div class="big">${N(S.user.balance)}</div></div>
+<div class="card"><h3 class="h">Withdraw to bank</h3><p class="mute">Min ₦200 • Max ₦500 • 1 withdrawal per day</p>
+<label>Bank name</label><input value="${esc(F.bank)}" oninput="F.bank=this.value" placeholder="e.g. Opay">
+<label>Account number</label><input value="${esc(F.account)}" oninput="F.account=this.value" inputmode="numeric" maxlength="10" placeholder="10 digits">
+<label>Account name</label><input value="${esc(F.name)}" oninput="F.name=this.value" placeholder="Name on the account">
+<label>Amount (₦)</label><input value="${esc(F.amount)}" oninput="F.amount=this.value" inputmode="numeric" placeholder="200 to 500">
+<button class="full" ${busy?"disabled":""} onclick="act('withdraw',{bank:F.bank,account:F.account,name:F.name,amount:F.amount})">WITHDRAW NOW</button></div>
+<div class="card"><h3 class="h">History</h3>${hist}</div>`}
+function profile(){const l="https://t.me/"+S.bot+"?start="+S.id;return `<div class="card c"><div style="font-size:56px">🦅</div><h2 class="h">${esc(S.user.first_name||"Eagle")}</h2><span class="mute">ID ${S.id}</span></div>
+<div class="card"><h3 class="h">Invite friends</h3><p>Earn <b>₦50</b> when a friend you invite completes 2 tasks.</p><input readonly value="${esc(l)}" onclick="this.select()"><div class="row"><button class="grow" onclick="copyL('${esc(l)}')">Copy link</button><button class="o grow" onclick="shareL('${esc(l)}')">Share</button></div><p class="mute">Successful referrals: ${S.referrals}</p></div>`}
+function go(t){tab=t;render();window.scrollTo(0,0)}
+function render(){
+  let b;
+  if(err)b=`<div class="card c"><p>${esc(err)}</p><button onclick="act('state')">Retry</button></div>`;
+  else if(!S)b='<div class="card c">Loading…</div>';
+  else if(!S.user.joined)b=gate();
+  else b={home:home,tasks:tasksTab,wallet:wallet,profile:profile}[tab]();
+  const nav=S&&S.user.joined&&!err?`<div class="nav">${[["home","🏠","Home"],["tasks","✅","Tasks"],["wallet","👛","Wallet"],["profile","👤","Profile"]].map(x=>`<button class="${tab===x[0]?"on":""}" onclick="go('${x[0]}')"><i>${x[1]}</i>${x[2]}</button>`).join("")}</div>`:"";
+  $.innerHTML=`<div class="wrap"><div class="logo"><b>🦅 EAGLE NGN</b><span>Earn • Grow • Withdraw</span></div>${b}</div>${nav}`;
+}
+render();act("state");
+</script>
+</body>
+  </html>
